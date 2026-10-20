@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>报名数据 · 参考版</title>
+<style>
+body{font:16px/1.6 "Segoe UI","Microsoft YaHei",sans-serif;color:#24332b;background:#f5f7f6;margin:0;padding:24px}main{max-width:1050px;margin:auto;background:white;padding:28px;border-top:4px solid #3dcd58}h1{margin-top:0}label{display:inline-block;margin:8px 20px 8px 0}input,select{font:inherit;max-width:100%;padding:6px}a{color:#007a30}.stats{display:flex;gap:40px;padding:20px 0;border-block:1px solid #ddd}.stats strong{display:block;font-size:32px}#chart{height:260px}.scroll{overflow:auto}table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:10px;border-bottom:1px solid #ddd}th{background:#edf8f0}:focus-visible{outline:3px solid #008a35;outline-offset:3px}@media(max-width:600px){body{padding:8px}main{padding:16px}.stats{gap:20px}}
+</style>
+<main>
+<h1>报名数据 · 参考版</h1>
+<p>模拟数据 · 部门筛选、统计与图表。<a href="../index.html">返回简陋初版</a></p>
+<label>选择 CSV <input id="file" type="file" accept=".csv,text/csv"></label>
+<label>部门 <select id="department" disabled><option value="">全部</option></select></label>
+<p id="message" role="status">选择本工程 data/registrations.csv 开始</p>
+<section class="stats" aria-label="当前筛选结果"><div>报名人数<strong id="count">0</strong></div><div>学习时长（小时）<strong id="hours">0</strong></div></section>
+<div id="chart" role="img" aria-label="各部门报名人数图"></div>
+<div class="scroll"><table><thead><tr><th>编号</th><th>姓名</th><th>部门</th><th>实际时长（小时）</th><th>城市</th><th>报名日期</th><th>课程</th><th>状态</th><th>计划时长</th><th>成绩</th><th>反馈</th></tr></thead><tbody id="rows"></tbody></table></div>
+</main>
+<script src="../csv.js"></script>
+<script src="../vendor/echarts.min.js"></script>
+<script>
+const select = document.querySelector('#department');
+const message = document.querySelector('#message');
+const chart = window.echarts ? window.echarts.init(document.querySelector('#chart')) : null;
+if (!chart) document.querySelector('#chart').textContent = '图表库未找到，请使用完整解压包。表格和筛选仍可使用。';
+let records = [], readVersion = 0;
+function render() {
+  const selected = records.filter(row => !select.value || row.department === select.value);
+  document.querySelector('#count').textContent = String(selected.length);
+  document.querySelector('#hours').textContent = String(selected.reduce((sum, row) => sum + row.hours, 0));
+  const tbody = document.querySelector('#rows');
+  tbody.replaceChildren();
+  for (const row of selected) {
+    const tr = document.createElement('tr');
+    for (const value of ["id", "name", "department", "hours", "city", "registered_on", "course", "status", "planned_hours", "score", "feedback"].map(key => row[key] ?? '')) {
+      const td = document.createElement('td'); td.textContent = String(value); tr.append(td);
+    }
+    tbody.append(tr);
+  }
+  const departments = [...new Set(selected.map(row => row.department))];
+  chart?.setOption({ animation: false, tooltip: {}, grid: { containLabel: true, left: 16, right: 16, bottom: 16 }, xAxis: { type: 'category', data: departments }, yAxis: { type: 'value', minInterval: 1, name: '人数' }, series: [{ id: 'registrations', type: 'bar', barMaxWidth: 70, itemStyle: { color: '#008a35' }, label: { show: true, position: 'top' }, data: departments.map(d => selected.filter(row => row.department === d).length) }] });
+}
+document.querySelector('#file').addEventListener('change', async event => {
+  const version = ++readVersion;
+  records = []; select.replaceChildren(new Option('全部', '')); select.disabled = true; render();
+  const file = event.target.files[0];
+  if (!file) { message.textContent = '尚未选择文件'; return; }
+  try {
+    const parsed = parseRegistrations(await file.text());
+    if (version !== readVersion) return;
+    records = parsed;
+    for (const dep of new Set(records.map(row => row.department))) select.add(new Option(dep, dep));
+    select.add(new Option('无结果检查（不存在的部门）', '__missing__'));
+    select.disabled = false; render(); message.textContent = `已读取 ${file.name}`;
+  } catch (error) {
+    if (version === readVersion) message.textContent = `无法读取：${error.message}`;
+  }
+});
+select.addEventListener('change', render);
+window.addEventListener('resize', () => chart?.resize());
+render();
+</script>
+</html>
