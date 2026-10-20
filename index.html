@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>报名数据 · 初版</title>
+<style>body{font:16px/1.6 system-ui,sans-serif;margin:32px;max-width:960px}table{border-collapse:collapse;width:100%}th,td{padding:8px;text-align:left;border:1px solid #ccc}input{margin:12px 0}#message{min-height:1.6em}</style>
+<h1>报名数据 · 初版</h1>
+<p>课程模拟数据。选择本工程 data 文件夹中的 registrations.csv。180 条模拟记录，包含城市、日期、课程与学习状态。文件只在本机读取。</p>
+<label>选择 CSV <input id="file" type="file" accept=".csv,text/csv"></label>
+<p id="message" role="status">尚未选择文件</p>
+<p>报名人数：<strong id="count">0</strong></p>
+<div style="overflow:auto"><table><thead><tr><th>编号</th><th>姓名</th><th>部门</th><th>实际时长（小时）</th><th>城市</th><th>报名日期</th><th>课程</th><th>状态</th><th>计划时长</th><th>成绩</th><th>反馈</th></tr></thead><tbody id="rows"></tbody></table></div>
+<p>下一步：让 AI 增加部门筛选、时长汇总或图表。参考 docs/需求说明.md。</p>
+<script src="csv.js"></script>
+<script>
+const fileInput = document.querySelector('#file');
+const rowsElement = document.querySelector('#rows');
+const count = document.querySelector('#count');
+const message = document.querySelector('#message');
+let readVersion = 0;
+fileInput.addEventListener('change', async () => {
+  const version = ++readVersion;
+  rowsElement.replaceChildren();
+  count.textContent = '0';
+  const file = fileInput.files[0];
+  if (!file) { message.textContent = '尚未选择文件'; return; }
+  try {
+    const records = parseRegistrations(await file.text());
+    if (version !== readVersion) return;
+    for (const record of records) {
+      const tr = document.createElement('tr');
+      for (const value of ["id", "name", "department", "hours", "city", "registered_on", "course", "status", "planned_hours", "score", "feedback"].map(key => record[key] ?? '')) {
+        const td = document.createElement('td');
+        td.textContent = String(value);
+        tr.append(td);
+      }
+      rowsElement.append(tr);
+    }
+    count.textContent = String(records.length);
+    message.textContent = `已读取 ${file.name}（${records.length} 人）`;
+  } catch (error) {
+    if (version === readVersion) message.textContent = `无法读取：${error.message}`;
+  }
+});
+</script>
+</html>
